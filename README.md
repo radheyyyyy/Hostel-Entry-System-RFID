@@ -330,16 +330,3 @@ Pull requests are welcome!
 4. Open a Pull Request
 
 ---
-
-## 📄 License
-
-MIT License
-
----
-
-## 👨‍💻 Author
-
-**Your Name**
-GitHub: https://github.com/yourusername
-
----
