@@ -241,35 +241,38 @@ Upload this code to your ESP32:
 #include <SPI.h>
 #include <MFRC522.h>
 
-#define SS_PIN 5
-#define RST_PIN 22
+// Correct pins for NodeMCU (ESP8266)
+#define SS_PIN D4    // SDA
+#define RST_PIN D3   // RST
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);
 
 void setup() {
   Serial.begin(115200);
-  SPI.begin();
-  mfrc522.PCD_Init();
+  SPI.begin();          // Start SPI
+  mfrc522.PCD_Init();   // Init RFID
 
-  Serial.println("Scan RFID Card");
+  Serial.println("Scan RFID Card...");
 }
 
 void loop() {
+  // Look for new card
   if (!mfrc522.PICC_IsNewCardPresent()) return;
   if (!mfrc522.PICC_ReadCardSerial()) return;
 
   String uid = "";
 
+  // Read UID
   for (byte i = 0; i < mfrc522.uid.size; i++) {
     uid += String(mfrc522.uid.uidByte[i], HEX);
   }
 
   uid.toUpperCase();
 
-  Serial.print("UID:");
+  Serial.print("UID: ");
   Serial.println(uid);
 
-  delay(1000); // prevents multiple scans
+  delay(1000); // avoid multiple reads
 }
 ```
 
