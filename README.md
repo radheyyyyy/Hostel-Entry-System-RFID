@@ -30,11 +30,11 @@ This project is a **Hostel Entry Monitoring System** that uses an **RFID reader 
 
 | MFRC522 Pin | NodeMCU Pin |
 | ----------- | ----------- |
-| SDA (SS)    | D4          |
+| SDA (SS)    | D2          |
 | SCK         | D5          |
 | MOSI        | D7          |
 | MISO        | D6          |
-| RST         | D3          |
+| RST         | D1          |
 | GND         | GND         |
 | 3.3V        | 3.3V        |
 
@@ -50,35 +50,41 @@ This code reads RFID card UID and sends it via Serial.
 #include <SPI.h>
 #include <MFRC522.h>
 
-#define SS_PIN D4
-#define RST_PIN D3
+#define SS_PIN D4   // SDA (SS)
+#define RST_PIN D3  // Reset
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);
 
 void setup() {
   Serial.begin(115200);
-  SPI.begin();
+  SPI.begin();        // Uses default SPI pins: D5, D6, D7
   mfrc522.PCD_Init();
 
-  Serial.println("Scan RFID Card...");
+  Serial.println("Place your RFID card...");
 }
 
 void loop() {
-  if (!mfrc522.PICC_IsNewCardPresent()) return;
-  if (!mfrc522.PICC_ReadCardSerial()) return;
-
-  String uid = "";
-
-  for (byte i = 0; i < mfrc522.uid.size; i++) {
-    uid += String(mfrc522.uid.uidByte[i], HEX);
+  // Check for new card
+  if (!mfrc522.PICC_IsNewCardPresent()) {
+    return;
   }
 
-  uid.toUpperCase();
+  // Read card UID
+  if (!mfrc522.PICC_ReadCardSerial()) {
+    return;
+  }
 
-  Serial.print("UID: ");
-  Serial.println(uid);
+  Serial.print("UID tag: ");
 
-  delay(1000);
+  for (byte i = 0; i < mfrc522.uid.size; i++) {
+    Serial.print(mfrc522.uid.uidByte[i] < 0x10 ? "0" : "");
+    Serial.print(mfrc522.uid.uidByte[i], HEX);
+    Serial.print(" ");
+  }
+
+  Serial.println();
+
+  mfrc522.PICC_HaltA();
 }
 ```
 
