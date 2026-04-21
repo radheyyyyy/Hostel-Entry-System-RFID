@@ -214,12 +214,15 @@ class HostelApp:
         while True:
             try:
                 line = self.ser.readline().decode().strip()
+
                 if line.startswith("UID:"):
                     uid = line.replace("UID:", "").strip()
 
                     current_time = time.time()
-                    if uid != self.last_uid or (current_time - self.last_scan_time) > self.SCAN_COOLDOWN:
-                        self.last_uid, self.last_scan_time = uid, current_time
+
+                    if (current_time - self.last_scan_time) > self.SCAN_COOLDOWN:
+                        self.last_uid = uid
+                        self.last_scan_time = current_time
 
                         if uid not in self.uid_info:
                             self.root.after(0, self.register_uid, uid)
@@ -229,9 +232,12 @@ class HostelApp:
                             self.uid_last_status[uid] = new_status
                             self.root.after(0, self.update_table, uid, new_status, False)
 
+                    self.ser.reset_input_buffer()
+
             except Exception as e:
-                print(f"Serial read error: {e}")
-            time.sleep(0.1)
+                    print(f"Serial read error: {e}")
+
+            time.sleep(0.05)
 
     def _start_serial_thread(self):
         try:
