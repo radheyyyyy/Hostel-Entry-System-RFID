@@ -15,7 +15,7 @@ This project is a **Hostel Entry Monitoring System** that uses an **RFID reader 
 
 ---
 
-## 🧰 Hardware Required
+##  Hardware Required
 
 * ESP8266 (NodeMCU)
 * MFRC522 RFID Module
@@ -52,7 +52,7 @@ This code reads RFID card UID and sends it via Serial.
 #include <SPI.h>
 #include <MFRC522.h>
 
-// 🔥 UPDATED PINS (your wiring)
+//  UPDATED PINS (your wiring)
 #define SS_PIN D2   // SDA
 #define RST_PIN D1  // RST
 
@@ -123,7 +123,7 @@ The Python app:
 * Updates entry/exit status
 * Displays GUI dashboard
 
-### 📦 Required Libraries
+###  Required Libraries
 
 ```bash
 pip install pyserial ttkbootstrap
@@ -145,15 +145,15 @@ pip install pyserial ttkbootstrap
 
 ---
 
-## ⚠️ Common Issues & Fixes
+##  Common Issues & Fixes
 
-### ❌ "Access is denied (COM port error)"
+###  "Access is denied (COM port error)"
 
 * Close Arduino Serial Monitor
 * Ensure correct COM port
 * Run Python as Administrator
 
-### ❌ RFID not detecting
+### RFID not detecting
 
 * Check wiring carefully
 * Ensure SPI pins are correct
