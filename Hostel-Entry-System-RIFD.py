@@ -8,6 +8,9 @@ import os
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 from ttkbootstrap.dialogs import Messagebox
+from serial.tools import list_ports
+import socket
+import requests
 
 class HostelApp:
     def __init__(self, root):
@@ -25,6 +28,7 @@ class HostelApp:
         self.last_scan_time = 0
         self.SCAN_COOLDOWN = 5  # seconds
         self.uid_to_item_id = {}
+        self.ADMIN_PASSWORD = "admin123"
 
         # --- Load Data ---
         self.uid_info = self._load_json(self.UID_DB_FILE)
@@ -92,6 +96,15 @@ class HostelApp:
 
         reset_button = ttk.Button(footer_frame, text="Reset All Records", command=self.reset_records, bootstyle=(DANGER, OUTLINE), width=20)
         reset_button.pack()
+        edit_button = ttk.Button(
+            footer_frame,
+            text="Edit Records",
+            command=self.edit_names,
+            bootstyle=(INFO, OUTLINE),
+            width=20
+        )
+        edit_button.pack(pady=5)
+        
 
     def _update_dashboard(self):
         residents_in_count = list(self.uid_last_status.values()).count("IN")
@@ -194,21 +207,112 @@ class HostelApp:
 
     # --- THIS IS THE CORRECTED FUNCTION ---
     def reset_records(self):
-        # The correct function name is 'askyesno' (all lowercase)
-        result = Messagebox.askyesno(
-            title="Confirm Reset",
-            message="⚠️ Are you sure you want to clear all status records? This action cannot be undone.",
-            alert=True
-        )
-        
-        # The function returns the string "Yes" or "No"
-        if result == "Yes":
-            self.tree.delete(*self.tree.get_children())
-            self.uid_last_status.clear()
-            self.uid_to_item_id.clear()
-            self._save_json(self.STATUS_FILE, self.uid_last_status)
-            self._update_dashboard()
-            Messagebox.showinfo("Reset Complete", "All status records have been cleared!")
+        popup = ttk.Toplevel(self.root)
+        popup.title("Admin Verification")
+        popup.geometry("300x150")
+
+        frame = ttk.Frame(popup, padding=20)
+        frame.pack(expand=True, fill="both")
+
+        ttk.Label(frame, text="Enter Admin Password:").pack(pady=5)
+
+        password_entry = ttk.Entry(frame, show="*")
+        password_entry.pack(pady=5)
+        password_entry.focus()
+
+        def verify():
+            if password_entry.get() != self.ADMIN_PASSWORD:
+                Messagebox.show_error("Access Denied", "Incorrect password!")
+                return
+
+            popup.destroy()
+
+            result = Messagebox.yesno(
+                title="Confirm Reset",
+                message="⚠️ Are you sure you want to clear all records?",
+                alert=True
+            )
+
+            if result == "Yes":
+                self.tree.delete(*self.tree.get_children())
+                self.uid_last_status.clear()
+                self.uid_to_item_id.clear()
+                self._save_json(self.STATUS_FILE, self.uid_last_status)
+                self._update_dashboard()
+                Messagebox.show_info("Reset Complete", "All records cleared!")
+
+        ttk.Button(frame, text="Verify", command=verify, bootstyle="success").pack(pady=10)
+    
+    
+    def edit_names(self):
+        def refresh_listbox():
+            listbox.delete(0, tk.END)
+            for uid, data in self.uid_info.items():
+                listbox.insert(tk.END, f"{uid} : {data['name']} (Room {data['room']})")
+
+        def update_selected():
+            selected = listbox.curselection()
+            if not selected:
+                Messagebox.show_warning("No Selection", "Please select a record first.")
+                return
+
+            uid = list(self.uid_info.keys())[selected[0]]
+            user = self.uid_info[uid]
+
+            # Popup for editing
+            edit_popup = ttk.Toplevel(edit_win)
+            edit_popup.title("Edit Details")
+            edit_popup.geometry("300x250")
+
+            frame = ttk.Frame(edit_popup, padding=20)
+            frame.pack(expand=True, fill="both")
+
+            ttk.Label(frame, text=f"UID: {uid}").pack(pady=5)
+
+            ttk.Label(frame, text="Name:").pack()
+            name_entry = ttk.Entry(frame)
+            name_entry.insert(0, user["name"])
+            name_entry.pack(pady=5)
+
+            ttk.Label(frame, text="Room:").pack()
+            room_entry = ttk.Entry(frame)
+            room_entry.insert(0, user["room"])
+            room_entry.pack(pady=5)
+
+            def save_changes():
+                new_name = name_entry.get().strip()
+                new_room = room_entry.get().strip()
+
+                if not new_name or not new_room:
+                    Messagebox.show_warning("Missing Info", "All fields are required.")
+                    return
+
+                # ✅ Update data
+                self.uid_info[uid] = {"name": new_name, "room": new_room}
+                self._save_json(self.UID_DB_FILE, self.uid_info)
+
+                # ✅ 🔥 THIS LINE FIXES YOUR PROBLEM (instant UI update)
+                self.update_table(uid, self.uid_last_status.get(uid, "OUT"), silent=True)
+
+                refresh_listbox()
+                self._update_dashboard()
+
+                Messagebox.show_info("Updated", "Details updated successfully!")
+                edit_popup.destroy()
+
+            ttk.Button(frame, text="Save", command=save_changes, bootstyle="success").pack(pady=10)
+
+        # Main window
+        edit_win = ttk.Toplevel(self.root)
+        edit_win.title("Edit UID Records")
+        edit_win.geometry("400x300")
+
+        listbox = tk.Listbox(edit_win, width=50)
+        listbox.pack(pady=10, fill="both", expand=True)
+
+        refresh_listbox()
+
+        ttk.Button(edit_win, text="Edit Selected", command=update_selected, bootstyle="primary").pack(pady=5)
 
     def read_serial(self):
         while True:
@@ -238,16 +342,124 @@ class HostelApp:
                     print(f"Serial read error: {e}")
 
             time.sleep(0.05)
+               
+    def read_wifi(self):
+        while True:
+            try:
+                response = requests.get("http://192.168.4.1/uid", timeout=1)
+    
+                if response.status_code == 200:
+                    line = response.text.strip()
+    
+                    # ✅ Empty response ignore karo (ESP often blank bhejta hai)
+                    if not line:
+                        time.sleep(0.2)
+                        continue
+                    
+                    if line.startswith("UID:"):
+                        uid = line.replace("UID:", "").strip()
+    
+                        current_time = time.time()
+    
+                        # ✅ Cooldown check
+                        if (current_time - self.last_scan_time) > self.SCAN_COOLDOWN:
+                            self.last_uid = uid
+                            self.last_scan_time = current_time
+    
+                            if uid not in self.uid_info:
+                                self.root.after(0, self.register_uid, uid)
+                            else:
+                                last_status = self.uid_last_status.get(uid, "OUT")
+                                new_status = "IN" if last_status == "OUT" else "OUT"
+                                self.uid_last_status[uid] = new_status
+                                self.root.after(0, self.update_table, uid, new_status, False)
+    
+            except Exception as e:
+                # ❌ spam avoid (optional: comment this line)
+                # print(f"WiFi read error: {e}")
+                pass
+            
+            time.sleep(0.3)    
 
+    def find_arduino_port(self):
+        ports = list_ports.comports()
+        # 🔍 Debug: sab ports print karega
+        print("\nAvailable Ports:")
+        for port in ports:
+            print(f"{port.device} - {port.description} (VID: {port.vid}, PID: {port.pid})")
+        # 🔥 STEP 1: Try ESP8266 via WiFi first
+        try:
+            if self.check_wifi_device():
+                print("✅ ESP8266 detected over WiFi")
+                self.connection_mode = "wifi"
+                return "WIFI"
+        except Exception as e:
+            print("WiFi check failed:", e)
+        # 🔥 STEP 2: Try Serial (USB)
+        for port in ports:
+            desc = port.description.lower()
+            if any(keyword in desc for keyword in [
+                "cp210", "ch340", "usb serial", "silicon labs", "uart"
+            ]):
+                print(f"✅ Serial device detected: {port.device}")
+                self.connection_mode = "serial"
+                return port.device
+        # 🔁 STEP 3: Fallback (first available port)
+        if ports:
+            print(f"⚠️ Fallback port used: {ports[0].device}")
+            self.connection_mode = "serial"
+            return ports[0].device
+        # ❌ No device found
+        print("❌ No device found (WiFi or Serial)")
+        self.connection_mode = None
+        return None
+    def check_wifi_device(self):
+        try:
+            response = requests.get("http://192.168.4.1/uid", timeout=1)
+            return response.status_code == 200
+        except:
+            return False
     def _start_serial_thread(self):
         try:
-            self.ser = serial.Serial('COM7', 115200, timeout=1)
+            # 🔥 Step 1: Try WiFi
+            if self.check_wifi_device():
+                print("Connected via WiFi")
+    
+                # Start WiFi reading thread
+                wifi_thread = threading.Thread(target=self.read_wifi, daemon=True)
+                wifi_thread.start()
+                return
+    
+            # 🔁 Step 2: fallback to Serial
+            print("WiFi not found, switching to Serial...")
+    
+            port = self.find_arduino_port()
+    
+            if port is None:
+                Messagebox.show_error(
+                    title="Connection Error",
+                    message="No device found (WiFi or Serial)!"
+                )
+                return
+    
+            print(f"Connected via Serial: {port}")
+    
+            if port == "WIFI":
+                print("📡 Using WiFi mode")
+                wifi_thread = threading.Thread(target=self.read_wifi, daemon=True)
+                wifi_thread.start()
+                return
+            self.ser = serial.Serial(port, 115200, timeout=1)
+    
             serial_thread = threading.Thread(target=self.read_serial, daemon=True)
             serial_thread.start()
-        except serial.SerialException as e:
-            Messagebox.show_error(title="Connection Error", 
-                                  message=f"Could not connect to RFID reader on COM7.\n\nPlease check the connection and restart the application.\nError: {e}")
-
+    
+        except Exception as e:
+            Messagebox.show_error(
+                title="Connection Error",
+                message=f"Connection failed: {e}"
+            )
+    
     def _restore_previous_state(self):
         for uid, status in self.uid_last_status.items():
             self.update_table(uid, status, silent=True)
