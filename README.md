@@ -47,44 +47,68 @@ This project is a **Hostel Entry Monitoring System** that uses an **RFID reader 
 This code reads RFID card UID and sends it via Serial.
 
 ```cpp
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
 #include <SPI.h>
 #include <MFRC522.h>
 
-#define SS_PIN D4   // SDA (SS)
-#define RST_PIN D3  // Reset
+// 🔥 UPDATED PINS (your wiring)
+#define SS_PIN D2   // SDA
+#define RST_PIN D1  // RST
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);
+ESP8266WebServer server(80);
+
+// WiFi AP
+const char* ssid = "RFID_SYSTEM";
+const char* password = "********";
+
+String lastUID = "";
+
+void handleUID() {
+  if (lastUID != "") {
+    server.send(200, "text/plain", "UID:" + lastUID);
+    lastUID = ""; // send once
+  } else {
+    server.send(200, "text/plain", "");
+  }
+}
 
 void setup() {
   Serial.begin(115200);
-  SPI.begin();        // Uses default SPI pins: D5, D6, D7
+  SPI.begin();  // uses default pins: D5, D6, D7
+
   mfrc522.PCD_Init();
 
-  Serial.println("Place your RFID card...");
+  WiFi.softAP(ssid, password);
+
+  Serial.println("WiFi AP Started");
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.softAPIP());
+
+  server.on("/uid", handleUID);
+  server.begin();
 }
 
 void loop() {
-  // Check for new card
-  if (!mfrc522.PICC_IsNewCardPresent()) {
-    return;
-  }
+  server.handleClient();
 
-  // Read card UID
-  if (!mfrc522.PICC_ReadCardSerial()) {
-    return;
-  }
+  if (!mfrc522.PICC_IsNewCardPresent()) return;
+  if (!mfrc522.PICC_ReadCardSerial()) return;
 
-  Serial.print("UID tag: ");
+  String uid = "";
 
   for (byte i = 0; i < mfrc522.uid.size; i++) {
-    Serial.print(mfrc522.uid.uidByte[i] < 0x10 ? "0" : "");
-    Serial.print(mfrc522.uid.uidByte[i], HEX);
-    Serial.print(" ");
+    uid += String(mfrc522.uid.uidByte[i], HEX);
+    if (i != mfrc522.uid.size - 1) uid += " ";
   }
 
-  Serial.println();
+  uid.toUpperCase();
+  lastUID = uid;
 
-  mfrc522.PICC_HaltA();
+  Serial.println("UID: " + uid);
+
+  delay(1000);
 }
 ```
 
