@@ -375,7 +375,7 @@ class HostelApp:
                                 self.root.after(0, self.update_table, uid, new_status, False)
     
             except Exception as e:
-                # ❌ spam avoid (optional: comment this line)
+                #  spam avoid (optional: comment this line)
                 # print(f"WiFi read error: {e}")
                 pass
             
@@ -383,11 +383,11 @@ class HostelApp:
 
     def find_arduino_port(self):
         ports = list_ports.comports()
-        # 🔍 Debug: sab ports print karega
+        #  Debug: sab ports print karega
         print("\nAvailable Ports:")
         for port in ports:
             print(f"{port.device} - {port.description} (VID: {port.vid}, PID: {port.pid})")
-        # 🔥 STEP 1: Try ESP8266 via WiFi first
+        # STEP 1: Try ESP8266 via WiFi first
         try:
             if self.check_wifi_device():
                 print(" ESP8266 detected over WiFi")
@@ -395,7 +395,7 @@ class HostelApp:
                 return "WIFI"
         except Exception as e:
             print("WiFi check failed:", e)
-        # 🔥 STEP 2: Try Serial (USB)
+        #  STEP 2: Try Serial (USB)
         for port in ports:
             desc = port.description.lower()
             if any(keyword in desc for keyword in [
@@ -404,13 +404,13 @@ class HostelApp:
                 print(f" Serial device detected: {port.device}")
                 self.connection_mode = "serial"
                 return port.device
-        # 🔁 STEP 3: Fallback (first available port)
+        #  STEP 3: Fallback (first available port)
         if ports:
             print(f" Fallback port used: {ports[0].device}")
             self.connection_mode = "serial"
             return ports[0].device
-        # ❌ No device found
-        print("❌ No device found (WiFi or Serial)")
+        #  No device found
+        print(" No device found (WiFi or Serial)")
         self.connection_mode = None
         return None
     def check_wifi_device(self):
@@ -430,7 +430,7 @@ class HostelApp:
                 wifi_thread.start()
                 return
     
-            # 🔁 Step 2: fallback to Serial
+            # Step 2: fallback to Serial
             print("WiFi not found, switching to Serial...")
     
             port = self.find_arduino_port()
