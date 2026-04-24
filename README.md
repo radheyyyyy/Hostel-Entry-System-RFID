@@ -4,14 +4,14 @@ This project is a **Hostel Entry Monitoring System** that uses an **RFID reader 
 
 ---
 
-## 🚀 Features
+##  Features
 
-* 📡 RFID-based entry/exit tracking
-* 🧑‍🎓 Automatic student identification via UID
-* 🔄 IN/OUT status toggle system
-* 📊 Live dashboard (Python GUI)
-* 📝 Entry logs stored in file
-* 🆕 New card registration system
+* RFID-based entry/exit tracking
+*  Automatic student identification via UID
+*  IN/OUT status toggle system
+*  Live dashboard (Python GUI)
+*  Entry logs stored in file
+*  New card registration system
 
 ---
 
@@ -38,7 +38,7 @@ This project is a **Hostel Entry Monitoring System** that uses an **RFID reader 
 | GND         | GND         |
 | 3.3V        | 3.3V        |
 
-> ⚠️ **Important Note:** Do NOT connect to 5V. Use only **3.3V**.
+> **Important Note:** Do NOT connect to 5V. Use only **3.3V**.
 
 ---
 
@@ -164,7 +164,7 @@ pip install pyserial ttkbootstrap
 ## 📁 Project Structure
 
 ```
-📦 project-folder
+ project-folder
  ┣ 📜 esp8266_rfid.ino
  ┣ 📜 main_app.py
  ┣ 📜 uid_details.json
@@ -177,10 +177,10 @@ pip install pyserial ttkbootstrap
 
 ## 📌 Future Improvements
 
-* 🌐 Web-based dashboard
-* 📲 Mobile notifications
-* 🔐 Face recognition integration
-* ☁️ Cloud database
+*  Web-based dashboard
+*  Mobile notifications
+*  Face recognition integration
+*  Cloud database
 
 ---
 
