@@ -287,11 +287,11 @@ class HostelApp:
                     Messagebox.show_warning("Missing Info", "All fields are required.")
                     return
 
-                # ✅ Update data
+                #  Update data
                 self.uid_info[uid] = {"name": new_name, "room": new_room}
                 self._save_json(self.UID_DB_FILE, self.uid_info)
 
-                # ✅ 🔥 THIS LINE FIXES YOUR PROBLEM (instant UI update)
+                # THIS LINE FIXES YOUR PROBLEM (instant UI update)
                 self.update_table(uid, self.uid_last_status.get(uid, "OUT"), silent=True)
 
                 refresh_listbox()
@@ -351,7 +351,7 @@ class HostelApp:
                 if response.status_code == 200:
                     line = response.text.strip()
     
-                    # ✅ Empty response ignore karo (ESP often blank bhejta hai)
+                    #  Empty response ignore karo (ESP often blank bhejta hai)
                     if not line:
                         time.sleep(0.2)
                         continue
@@ -361,7 +361,7 @@ class HostelApp:
     
                         current_time = time.time()
     
-                        # ✅ Cooldown check
+                        # Cooldown check
                         if (current_time - self.last_scan_time) > self.SCAN_COOLDOWN:
                             self.last_uid = uid
                             self.last_scan_time = current_time
@@ -390,7 +390,7 @@ class HostelApp:
         # 🔥 STEP 1: Try ESP8266 via WiFi first
         try:
             if self.check_wifi_device():
-                print("✅ ESP8266 detected over WiFi")
+                print(" ESP8266 detected over WiFi")
                 self.connection_mode = "wifi"
                 return "WIFI"
         except Exception as e:
@@ -401,12 +401,12 @@ class HostelApp:
             if any(keyword in desc for keyword in [
                 "cp210", "ch340", "usb serial", "silicon labs", "uart"
             ]):
-                print(f"✅ Serial device detected: {port.device}")
+                print(f" Serial device detected: {port.device}")
                 self.connection_mode = "serial"
                 return port.device
         # 🔁 STEP 3: Fallback (first available port)
         if ports:
-            print(f"⚠️ Fallback port used: {ports[0].device}")
+            print(f" Fallback port used: {ports[0].device}")
             self.connection_mode = "serial"
             return ports[0].device
         # ❌ No device found
@@ -421,7 +421,7 @@ class HostelApp:
             return False
     def _start_serial_thread(self):
         try:
-            # 🔥 Step 1: Try WiFi
+            #  Step 1: Try WiFi
             if self.check_wifi_device():
                 print("Connected via WiFi")
     
