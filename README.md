@@ -175,7 +175,7 @@ pip install pyserial ttkbootstrap
 
 ---
 
-## 📌 Future Improvements
+##  Future Improvements
 
 *  Web-based dashboard
 *  Mobile notifications
