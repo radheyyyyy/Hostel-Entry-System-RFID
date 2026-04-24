@@ -229,7 +229,7 @@ class HostelApp:
 
             result = Messagebox.yesno(
                 title="Confirm Reset",
-                message="⚠️ Are you sure you want to clear all records?",
+                message=" Are you sure you want to clear all records?",
                 alert=True
             )
 
