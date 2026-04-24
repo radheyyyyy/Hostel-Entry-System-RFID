@@ -38,7 +38,7 @@ This project is a **Hostel Entry Monitoring System** that uses an **RFID reader 
 | GND         | GND         |
 | 3.3V        | 3.3V        |
 
-> ⚠️ **Important:** Do NOT connect to 5V. Use only **3.3V**.
+> ⚠️ **Important Note:** Do NOT connect to 5V. Use only **3.3V**.
 
 ---
 
