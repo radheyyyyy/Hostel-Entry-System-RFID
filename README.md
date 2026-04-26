@@ -51,48 +51,91 @@ This code reads RFID card UID and sends it via Serial.
 #include <ESP8266WebServer.h>
 #include <SPI.h>
 #include <MFRC522.h>
+#include <Wire.h>
+#include <U8g2lib.h>
 
-//  UPDATED PINS (your wiring)
-#define SS_PIN D2   // SDA
-#define RST_PIN D1  // RST
+// 🔥 YOUR CORRECT PINS
+#define SS_PIN D8
+#define RST_PIN D0
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);
 ESP8266WebServer server(80);
 
+// OLED SH1106
+U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
+
 // WiFi AP
 const char* ssid = "RFID_SYSTEM";
-const char* password = "********";
+const char* password = "12345678";
 
 String lastUID = "";
+String displayName = "Scan Card";
+String displayStatus = "";
 
+
+// 🔹 Send UID to Python
 void handleUID() {
   if (lastUID != "") {
     server.send(200, "text/plain", "UID:" + lastUID);
-    lastUID = ""; // send once
+    lastUID = "";
   } else {
     server.send(200, "text/plain", "");
   }
 }
 
+// 🔹 Receive Name + Status from Python
+void handleDisplay() {
+  if (server.hasArg("name") && server.hasArg("status")) {
+    displayName = server.arg("name");
+    displayStatus = server.arg("status");
+
+    Serial.println("Display Update:");
+    Serial.println(displayName + " - " + displayStatus);
+
+    server.send(200, "text/plain", "OK");
+  }
+}
+
+
+// 🔹 OLED update function
+void updateOLED() {
+  u8g2.clearBuffer();
+
+  u8g2.setFont(u8g2_font_ncenB08_tr);
+  u8g2.drawStr(0, 15, "Hostel System");
+
+  u8g2.setFont(u8g2_font_ncenB10_tr);
+  u8g2.drawStr(0, 35, displayName.c_str());
+
+  u8g2.setFont(u8g2_font_ncenB14_tr);
+  u8g2.drawStr(0, 60, displayStatus.c_str());
+
+  u8g2.sendBuffer();
+}
+
 void setup() {
   Serial.begin(115200);
-  SPI.begin();  // uses default pins: D5, D6, D7
-
+  SPI.begin();
   mfrc522.PCD_Init();
+
+  u8g2.begin();
 
   WiFi.softAP(ssid, password);
 
-  Serial.println("WiFi AP Started");
-  Serial.print("IP Address: ");
-  Serial.println(WiFi.softAPIP());
-
   server.on("/uid", handleUID);
+  server.on("/display", handleDisplay);
+
   server.begin();
+
+  displayName = "Ready...";
+  displayStatus = "";
+  updateOLED();
 }
 
 void loop() {
   server.handleClient();
 
+  // RFID scan
   if (!mfrc522.PICC_IsNewCardPresent()) return;
   if (!mfrc522.PICC_ReadCardSerial()) return;
 
@@ -108,8 +151,9 @@ void loop() {
 
   Serial.println("UID: " + uid);
 
-  delay(1000);
+  delay(500);
 }
+
 ```
 
 ---
