@@ -229,7 +229,7 @@ class HostelApp:
 
             result = Messagebox.yesno(
                 title="Confirm Reset",
-                message=" Are you sure you want to clear all records?",
+                message="⚠️ Are you sure you want to clear all records?",
                 alert=True
             )
 
@@ -287,11 +287,11 @@ class HostelApp:
                     Messagebox.show_warning("Missing Info", "All fields are required.")
                     return
 
-                #  Update data
+                # ✅ Update data
                 self.uid_info[uid] = {"name": new_name, "room": new_room}
                 self._save_json(self.UID_DB_FILE, self.uid_info)
 
-                # THIS LINE FIXES YOUR PROBLEM (instant UI update)
+                # ✅ 🔥 THIS LINE FIXES YOUR PROBLEM (instant UI update)
                 self.update_table(uid, self.uid_last_status.get(uid, "OUT"), silent=True)
 
                 refresh_listbox()
@@ -335,14 +335,21 @@ class HostelApp:
                             new_status = "IN" if last_status == "OUT" else "OUT"
                             self.uid_last_status[uid] = new_status
                             self.root.after(0, self.update_table, uid, new_status, False)
-
+                            self.send_to_oled(self.uid_info[uid]["name"], new_status)
                     self.ser.reset_input_buffer()
 
             except Exception as e:
                     print(f"Serial read error: {e}")
 
             time.sleep(0.05)
-               
+    
+    def send_to_oled(self, name, status):
+        try:
+            url = f"http://192.168.4.1/display?name={name}&status={status}"
+            requests.get(url, timeout=1)
+        except:
+            pass
+           
     def read_wifi(self):
         while True:
             try:
@@ -351,7 +358,7 @@ class HostelApp:
                 if response.status_code == 200:
                     line = response.text.strip()
     
-                    #  Empty response ignore karo (ESP often blank bhejta hai)
+                    # ✅ Empty response ignore karo (ESP often blank bhejta hai)
                     if not line:
                         time.sleep(0.2)
                         continue
@@ -361,7 +368,7 @@ class HostelApp:
     
                         current_time = time.time()
     
-                        # Cooldown check
+                        # ✅ Cooldown check
                         if (current_time - self.last_scan_time) > self.SCAN_COOLDOWN:
                             self.last_uid = uid
                             self.last_scan_time = current_time
@@ -375,7 +382,7 @@ class HostelApp:
                                 self.root.after(0, self.update_table, uid, new_status, False)
     
             except Exception as e:
-                #  spam avoid (optional: comment this line)
+                # ❌ spam avoid (optional: comment this line)
                 # print(f"WiFi read error: {e}")
                 pass
             
@@ -383,34 +390,34 @@ class HostelApp:
 
     def find_arduino_port(self):
         ports = list_ports.comports()
-        #  Debug: sab ports print karega
+        # 🔍 Debug: sab ports print karega
         print("\nAvailable Ports:")
         for port in ports:
             print(f"{port.device} - {port.description} (VID: {port.vid}, PID: {port.pid})")
-        # STEP 1: Try ESP8266 via WiFi first
+        # 🔥 STEP 1: Try ESP8266 via WiFi first
         try:
             if self.check_wifi_device():
-                print(" ESP8266 detected over WiFi")
+                print("✅ ESP8266 detected over WiFi")
                 self.connection_mode = "wifi"
                 return "WIFI"
         except Exception as e:
             print("WiFi check failed:", e)
-        #  STEP 2: Try Serial (USB)
+        # 🔥 STEP 2: Try Serial (USB)
         for port in ports:
             desc = port.description.lower()
             if any(keyword in desc for keyword in [
                 "cp210", "ch340", "usb serial", "silicon labs", "uart"
             ]):
-                print(f" Serial device detected: {port.device}")
+                print(f"✅ Serial device detected: {port.device}")
                 self.connection_mode = "serial"
                 return port.device
-        #  STEP 3: Fallback (first available port)
+        # 🔁 STEP 3: Fallback (first available port)
         if ports:
-            print(f" Fallback port used: {ports[0].device}")
+            print(f"⚠️ Fallback port used: {ports[0].device}")
             self.connection_mode = "serial"
             return ports[0].device
-        #  No device found
-        print(" No device found (WiFi or Serial)")
+        # ❌ No device found
+        print("❌ No device found (WiFi or Serial)")
         self.connection_mode = None
         return None
     def check_wifi_device(self):
@@ -421,7 +428,7 @@ class HostelApp:
             return False
     def _start_serial_thread(self):
         try:
-            #  Step 1: Try WiFi
+            # 🔥 Step 1: Try WiFi
             if self.check_wifi_device():
                 print("Connected via WiFi")
     
@@ -430,7 +437,7 @@ class HostelApp:
                 wifi_thread.start()
                 return
     
-            # Step 2: fallback to Serial
+            # 🔁 Step 2: fallback to Serial
             print("WiFi not found, switching to Serial...")
     
             port = self.find_arduino_port()
