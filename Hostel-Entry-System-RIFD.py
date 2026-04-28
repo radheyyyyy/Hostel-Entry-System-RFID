@@ -29,6 +29,8 @@ class HostelApp:
         self.SCAN_COOLDOWN = 5  # seconds
         self.uid_to_item_id = {}
         self.ADMIN_PASSWORD = "admin123"
+        self.pending_uid = None
+        self.last_movement = ""
 
         # --- Load Data ---
         self.uid_info = self._load_json(self.UID_DB_FILE)
@@ -73,7 +75,7 @@ class HostelApp:
         table_frame = ttk.Frame(self.root, padding=20)
         table_frame.pack(expand=True, fill=BOTH)
 
-        columns = ("UID", "Name", "Room", "Status", "Time")
+        columns = ("UID", "Name", "Room", "Status", "Move", "Time")
         self.tree = ttk.Treeview(table_frame, columns=columns, show="headings", bootstyle=PRIMARY)
         for col in columns:
             self.tree.heading(col, text=col)
@@ -107,7 +109,10 @@ class HostelApp:
         
 
     def _update_dashboard(self):
-        residents_in_count = list(self.uid_last_status.values()).count("IN")
+        residents_in_count = sum(
+            1 for v in self.uid_last_status.values() 
+            if (v["status"] if isinstance(v, dict) else v) == "IN"
+        )
         total_residents_count = len(self.uid_info)
         
         self.residents_in_label.config(text=f"Residents In: {residents_in_count}")
@@ -115,13 +120,13 @@ class HostelApp:
 
     def log_scan(self, uid, name, room, status, timestamp):
         with open(self.SCAN_LOG_FILE, "a") as f:
-            f.write(f"{timestamp} | UID: {uid} | Name: {name} | Room: {room} | Status: {status}\n")
+            f.write(f"{timestamp} | UID: {uid} | Name: {name} | Room: {room} | Status: {status} | Move: {self.last_movement}\n")
 
     def update_table(self, uid, status, silent=False):
         now_str = time.strftime('%Y-%m-%d %H:%M:%S')
         user = self.uid_info.get(uid, {"name": "Unknown", "room": "N/A"})
 
-        values = (uid, user["name"], user["room"], status, now_str)
+        values = (uid, user["name"], user["room"], status, self.last_movement, now_str)
 
         all_iids = self.tree.get_children()
         row_tag = 'evenrow'
@@ -142,7 +147,7 @@ class HostelApp:
         
         if not silent:
             self.show_popup(user["name"], status)
-            self.log_scan(uid, user["name"], user["room"], status, now_str)
+            # self.log_scan(uid, user["name"], user["room"], status, now_str) y krnaaa h 
             self._save_json(self.STATUS_FILE, self.uid_last_status)
             self._update_dashboard()
 
@@ -194,7 +199,10 @@ class HostelApp:
             if name and room:
                 self.uid_info[uid] = {"name": name, "room": room}
                 self._save_json(self.UID_DB_FILE, self.uid_info)
-                self.uid_last_status[uid] = "OUT"
+                self.uid_last_status[uid] = {
+                    "status": "IN",
+                    "move": ""
+                }
                 self._save_json(self.STATUS_FILE, self.uid_last_status)
                 Messagebox.show_info(title="Success", message=f"{name} has been successfully registered!")
                 self._update_dashboard()
@@ -318,29 +326,76 @@ class HostelApp:
         while True:
             try:
                 line = self.ser.readline().decode().strip()
-
+    
+                # 🔹 UID aaya
                 if line.startswith("UID:"):
                     uid = line.replace("UID:", "").strip()
-
+    
                     current_time = time.time()
-
+    
                     if (current_time - self.last_scan_time) > self.SCAN_COOLDOWN:
-                        self.last_uid = uid
                         self.last_scan_time = current_time
-
-                        if uid not in self.uid_info:
-                            self.root.after(0, self.register_uid, uid)
+    
+                        data = self.uid_last_status.get(uid, {"status": "IN", "move": ""})
+                        last_status = data["status"]
+    
+                        if last_status == "IN":
+                            # 🔥 OUT ja raha hai → MOVE ka wait
+                            self.pending_uid = uid
                         else:
-                            last_status = self.uid_last_status.get(uid, "OUT")
-                            new_status = "IN" if last_status == "OUT" else "OUT"
-                            self.uid_last_status[uid] = new_status
+                            # 🔥 IN aa raha hai → direct entry
+                            new_status = "IN"
+                            self.last_movement = "" 
+                            self.uid_last_status[uid] = {
+                                "status": new_status,
+                                "move": "movement"
+                            }
+                            self._save_json(self.STATUS_FILE, self.uid_last_status)
+    
                             self.root.after(0, self.update_table, uid, new_status, False)
-                            self.send_to_oled(self.uid_info[uid]["name"], new_status)
-                    self.ser.reset_input_buffer()
-
+    
+                            self.send_to_oled(
+                                self.uid_info[uid]["name"],
+                                "IN"
+                            )
+    
+                # 🔹 MOVE aaya
+                elif line.startswith("MOVE:"):
+                    movement = line.replace("MOVE:", "").strip()
+                    self.last_movement = movement
+    
+                    if self.pending_uid:
+                        uid = self.pending_uid
+    
+                        new_status = "OUT"
+                        self.uid_last_status[uid] = {
+                            "status": new_status,
+                            "move": ""
+                        }
+                        self._save_json(self.STATUS_FILE, self.uid_last_status)
+                        
+    
+                        self.root.after(0, self.update_table, uid, new_status, False)
+    
+                        self.send_to_oled(
+                            self.uid_info[uid]["name"],
+                            "OUT - " + movement
+                        )
+                        self.log_scan(
+                            uid,
+                            self.uid_info[uid]["name"],
+                            self.uid_info[uid]["room"],
+                            new_status,
+                            time.strftime('%Y-%m-%d %H:%M:%S')
+                        )
+    
+                        self.pending_uid = None
+    
+                self.ser.reset_input_buffer()
+    
             except Exception as e:
-                    print(f"Serial read error: {e}")
-
+                print(f"Serial read error: {e}")
+    
             time.sleep(0.05)
     
     def send_to_oled(self, name, status):
@@ -353,40 +408,80 @@ class HostelApp:
     def read_wifi(self):
         while True:
             try:
-                response = requests.get("http://192.168.4.1/uid", timeout=1)
-    
-                if response.status_code == 200:
-                    line = response.text.strip()
-    
-                    # ✅ Empty response ignore karo (ESP often blank bhejta hai)
-                    if not line:
-                        time.sleep(0.2)
-                        continue
-                    
+                # 🔹 UID read
+                uid_response = requests.get("http://192.168.4.1/uid", timeout=1)
+                if uid_response.status_code == 200:
+                    line = uid_response.text.strip()
+
                     if line.startswith("UID:"):
                         uid = line.replace("UID:", "").strip()
-    
+
                         current_time = time.time()
-    
-                        # ✅ Cooldown check
+
                         if (current_time - self.last_scan_time) > self.SCAN_COOLDOWN:
-                            self.last_uid = uid
                             self.last_scan_time = current_time
-    
-                            if uid not in self.uid_info:
-                                self.root.after(0, self.register_uid, uid)
+
+                            data = self.uid_last_status.get(uid, {"status": "IN", "move": ""})
+                            last_status = data["status"]
+
+                            if last_status == "IN":
+                                self.pending_uid = uid
                             else:
-                                last_status = self.uid_last_status.get(uid, "OUT")
-                                new_status = "IN" if last_status == "OUT" else "OUT"
-                                self.uid_last_status[uid] = new_status
+                                new_status = "IN"
+                                self.last_movement = "" 
+                                self.uid_last_status[uid] = {
+                                    "status": new_status,
+                                    "move": "movement"
+                                }
+                                self._save_json(self.STATUS_FILE, self.uid_last_status)
+                                self.pending_uid = ""
+
                                 self.root.after(0, self.update_table, uid, new_status, False)
-    
-            except Exception as e:
-                # ❌ spam avoid (optional: comment this line)
-                # print(f"WiFi read error: {e}")
+
+                                self.send_to_oled(
+                                    self.uid_info[uid]["name"],
+                                    "IN"
+                                )
+
+                # 🔹 MOVE read
+                move_response = requests.get("http://192.168.4.1/move", timeout=1)
+                if move_response.status_code == 200:
+                    line = move_response.text.strip()
+
+                    if line.startswith("MOVE:"):
+                        movement = line.replace("MOVE:", "").strip()
+                        self.last_movement = movement
+
+                        if self.pending_uid:
+                            uid = self.pending_uid
+
+                            new_status = "OUT"
+                            self.uid_last_status[uid] = {
+                                "status": new_status,
+                                "move": ""
+                            }
+                            self._save_json(self.STATUS_FILE, self.uid_last_status)
+
+                            self.root.after(0, self.update_table, uid, new_status, False)
+
+                            self.send_to_oled(
+                                self.uid_info[uid]["name"],
+                                "OUT - " + movement
+                            )
+                            self.log_scan(
+                                uid,
+                                self.uid_info[uid]["name"],
+                                self.uid_info[uid]["room"],
+                                new_status,
+                                time.strftime('%Y-%m-%d %H:%M:%S')
+                            )
+
+                            self.pending_uid = None
+
+            except:
                 pass
-            
-            time.sleep(0.3)    
+
+            time.sleep(0.3)  
 
     def find_arduino_port(self):
         ports = list_ports.comports()
@@ -467,9 +562,23 @@ class HostelApp:
                 message=f"Connection failed: {e}"
             )
     
+    # def _restore_previous_state(self):
+    #     for uid, data in self.uid_last_status.items():
+    #         status = data["status"] if isinstance(data, dict) else data
+    #         self.update_table(uid, status, silent=True)
     def _restore_previous_state(self):
-        for uid, status in self.uid_last_status.items():
-            self.update_table(uid, status, silent=True)
+            for uid, data in self.uid_last_status.items():
+            
+                if isinstance(data, dict):
+                    status = data.get("status", "OUT")
+                    movement = data.get("move", "")
+                else:
+                    status = data
+                    movement = ""
+
+                self.last_movement = movement
+
+                self.update_table(uid, status, silent=True)
 
 if __name__ == "__main__":
     root = ttk.Window(themename="litera")
