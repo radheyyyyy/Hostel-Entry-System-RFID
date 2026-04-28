@@ -1,235 +1,274 @@
-# 🏠 Hostel Entry Monitoring System using RFID (ESP8266 + Python)
+# 🏠 Hostel Entry Monitoring System using RFID (ESP32 + Python)
 
-This project is a **Hostel Entry Monitoring System** that uses an **RFID reader (MFRC522)** with **ESP8266 (NodeMCU)** to scan student cards and send UID data to a **Python-based desktop application** for real-time tracking.
-
----
-
-##  Features
-
-* RFID-based entry/exit tracking
-*  Automatic student identification via UID
-*  IN/OUT status toggle system
-*  Live dashboard (Python GUI)
-*  Entry logs stored in file
-*  New card registration system
+A smart hostel monitoring system that tracks **IN/OUT movement of residents** using **RFID cards**, **ESP32**, and a **Python GUI dashboard** with real-time updates.
 
 ---
 
-##  Hardware Required
+## 🚀 Features
 
-* ESP8266 (NodeMCU)
+* 🔐 RFID-based authentication (MFRC522)
+* 🔄 Automatic IN/OUT status detection
+* 🎯 Movement tracking (CLASS / OUTSIDE)
+* 📡 Dual communication:
+
+  * WiFi (ESP32 Access Point)
+  * Serial fallback
+* 📺 OLED display for instant feedback
+* 🖥️ Python GUI dashboard (Tkinter + ttkbootstrap)
+* 📊 Real-time table updates
+* 💾 JSON-based persistent storage
+* 📝 Entry history logging system
+* 🛠️ Admin panel (Edit + Reset records)
+
+---
+
+## 🧰 Hardware Required
+
+* ESP32
 * MFRC522 RFID Module
+* OLED Display (SH1106, I2C)
+* Push Buttons (2x: CLASS / OUTSIDE)
 * RFID Cards/Tags
-* Jumper wires
+* Jumper Wires
 * Breadboard
-* USB cable
+* USB Cable
 
 ---
 
-## 🔌 Wiring (ESP8266 ↔ MFRC522)
+## 🔌 Wiring Connections
 
-| MFRC522 Pin | NodeMCU Pin |
-| ----------- | ----------- |
-| SDA (SS)    | D2          |
-| SCK         | D5          |
-| MOSI        | D7          |
-| MISO        | D6          |
-| RST         | D1          |
-| GND         | GND         |
-| 3.3V        | 3.3V        |
+### 🔹 ESP32 ↔ MFRC522 (SPI)
 
-> **Important Note:** Do NOT connect to 5V. Use only **3.3V**.
+| MFRC522 Pin | ESP32 Pin |
+| ----------- | --------- |
+| SDA (SS)    | GPIO 5    |
+| SCK         | GPIO 18   |
+| MOSI        | GPIO 23   |
+| MISO        | GPIO 19   |
+| RST         | GPIO 4    |
+| GND         | GND       |
+| 3.3V        | 3.3V      |
 
 ---
 
-## 💻 ESP8266 Code
+### 🔹 ESP32 ↔ OLED (I2C)
 
-This code reads RFID card UID and sends it via Serial.
+| OLED Pin | ESP32 Pin |
+| -------- | --------- |
+| VCC      | 3.3V      |
+| GND      | GND       |
+| SDA      | GPIO 21   |
+| SCL      | GPIO 22   |
 
-```cpp
-#include <ESP8266WiFi.h>
-#include <ESP8266WebServer.h>
-#include <SPI.h>
-#include <MFRC522.h>
-#include <Wire.h>
-#include <U8g2lib.h>
+---
 
-// 🔥 YOUR CORRECT PINS
-#define SS_PIN D8
-#define RST_PIN D0
+### 🔹 Buttons (Movement Selection)
 
-MFRC522 mfrc522(SS_PIN, RST_PIN);
-ESP8266WebServer server(80);
+| Button  | ESP32 Pin |
+| ------- | --------- |
+| CLASS   | GPIO 13   |
+| OUTSIDE | GPIO 12   |
 
-// OLED SH1106
-U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
+---
 
-// WiFi AP
-const char* ssid = "RFID_SYSTEM";
-const char* password = "12345678";
+⚠️ **Important Notes**
 
-String lastUID = "";
-String displayName = "Scan Card";
-String displayStatus = "";
+* Always use **3.3V (NOT 5V)**
+* Ensure proper grounding
+* Use pull-up buttons (INPUT_PULLUP in code)
 
+---
 
-// 🔹 Send UID to Python
-void handleUID() {
-  if (lastUID != "") {
-    server.send(200, "text/plain", "UID:" + lastUID);
-    lastUID = "";
-  } else {
-    server.send(200, "text/plain", "");
-  }
-}
+## 💻 ESP32 Code Features
 
-// 🔹 Receive Name + Status from Python
-void handleDisplay() {
-  if (server.hasArg("name") && server.hasArg("status")) {
-    displayName = server.arg("name");
-    displayStatus = server.arg("status");
+* Reads RFID UID
+* Creates WiFi Access Point:
 
-    Serial.println("Display Update:");
-    Serial.println(displayName + " - " + displayStatus);
-
-    server.send(200, "text/plain", "OK");
-  }
-}
-
-
-// 🔹 OLED update function
-void updateOLED() {
-  u8g2.clearBuffer();
-
-  u8g2.setFont(u8g2_font_ncenB08_tr);
-  u8g2.drawStr(0, 15, "Hostel System");
-
-  u8g2.setFont(u8g2_font_ncenB10_tr);
-  u8g2.drawStr(0, 35, displayName.c_str());
-
-  u8g2.setFont(u8g2_font_ncenB14_tr);
-  u8g2.drawStr(0, 60, displayStatus.c_str());
-
-  u8g2.sendBuffer();
-}
-
-void setup() {
-  Serial.begin(115200);
-  SPI.begin();
-  mfrc522.PCD_Init();
-
-  u8g2.begin();
-
-  WiFi.softAP(ssid, password);
-
-  server.on("/uid", handleUID);
-  server.on("/display", handleDisplay);
-
-  server.begin();
-
-  displayName = "Ready...";
-  displayStatus = "";
-  updateOLED();
-}
-
-void loop() {
-  server.handleClient();
-
-  // RFID scan
-  if (!mfrc522.PICC_IsNewCardPresent()) return;
-  if (!mfrc522.PICC_ReadCardSerial()) return;
-
-  String uid = "";
-
-  for (byte i = 0; i < mfrc522.uid.size; i++) {
-    uid += String(mfrc522.uid.uidByte[i], HEX);
-    if (i != mfrc522.uid.size - 1) uid += " ";
-  }
-
-  uid.toUpperCase();
-  lastUID = uid;
-
-  Serial.println("UID: " + uid);
-
-  delay(500);
-}
-
+```text
+SSID: RFID_SYSTEM
+Password: 12345678
+IP: 192.168.4.1
 ```
+
+* API Endpoints:
+
+  * `/uid` → sends UID
+  * `/move` → sends movement (CLASS / OUTSIDE)
+  * `/display` → receives name + status
+
+* OLED displays:
+
+  * Name
+  * Status (IN / OUT)
+  * Movement selection screen
+
+---
+
+## 🧠 System Workflow
+
+### 🔹 Step 1: Scan RFID
+
+* UID is read by ESP32
+* Sent to Python via WiFi
+
+---
+
+### 🔹 Step 2: Python Processing
+
+| Last Status | Action            |
+| ----------- | ----------------- |
+| OUT         | Mark as IN        |
+| IN          | Wait for movement |
+
+---
+
+### 🔹 Step 3: Movement Selection
+
+* User presses:
+
+  * CLASS button
+  * OUTSIDE button
+* ESP32 sends movement
+
+---
+
+### 🔹 Step 4: Final Update
+
+* Status set to OUT
+* Movement stored
+* GUI + OLED updated
 
 ---
 
 ## 🖥️ Python Application
 
-The Python app:
+### 🔹 Features
 
-* Reads serial data from ESP8266
-* Matches UID with database
-* Updates entry/exit status
-* Displays GUI dashboard
+* Live dashboard
+* Table with:
 
-###  Required Libraries
+  * UID
+  * Name
+  * Room
+  * Status
+  * Movement
+  * Timestamp
+* Popup notifications (IN / OUT)
+* Admin controls:
+
+  * Reset records (password protected)
+  * Edit user details
+
+---
+
+## 📦 Required Python Libraries
 
 ```bash
-pip install pyserial ttkbootstrap
+pip install pyserial ttkbootstrap requests
 ```
-
----
-
-## ⚙️ Setup Instructions
-
-1. Upload the ESP8266 code using Arduino IDE
-2. Connect RFID module properly
-3. Check COM port in Device Manager
-4. Update COM port in Python code:
-
-   ```python
-   serial.Serial('COM7', 115200)
-   ```
-5. Run the Python application
-
----
-
-##  Common Issues & Fixes
-
-###  "Access is denied (COM port error)"
-
-* Close Arduino Serial Monitor
-* Ensure correct COM port
-* Run Python as Administrator
-
-### RFID not detecting
-
-* Check wiring carefully
-* Ensure SPI pins are correct
-* Use 3.3V power only
 
 ---
 
 ## 📁 Project Structure
 
 ```
- project-folder
- ┣ 📜 esp8266_rfid.ino
- ┣ 📜 main_app.py
- ┣ 📜 uid_details.json
- ┣ 📜 uid_status.json
- ┣ 📜 entry_history.txt
- ┗ 📜 README.md
+project-folder/
+┣ 📜 main.py
+┣ 📜 esp32_code.ino
+┣ 📜 uid_details.json
+┣ 📜 uid_status.json
+┣ 📜 entry_history.txt
+┗ 📜 README.md
 ```
 
 ---
 
-##  Future Improvements
+## 💾 Data Storage
 
-*  Web-based dashboard
-*  Mobile notifications
-*  Face recognition integration
-*  Cloud database
+### uid_details.json
+
+```json
+{
+  "UID123": {
+    "name": "Raj",
+    "room": "D-318"
+  }
+}
+```
+
+### uid_status.json
+
+```json
+{
+  "UID123": {
+    "status": "OUT",
+    "move": "CLASS"
+  }
+}
+```
 
 ---
 
-##  Support
+## ⚙️ Setup Instructions
+
+### 🔹 ESP32
+
+1. Open Arduino IDE
+2. Select ESP32 board
+3. Upload code
+4. Power the device
+
+---
+
+### 🔹 Python App
+
+```bash
+python main.py
+```
+
+---
+
+## ⚠️ Common Issues & Fixes
+
+### 🔴 WiFi not connecting
+
+* Connect to **RFID_SYSTEM**
+* Check IP: `192.168.4.1`
+
+### 🔴 RFID not detecting
+
+* Check SPI wiring
+* Ensure correct pins
+
+### 🔴 OLED not working
+
+* Verify SDA/SCL pins
+* Check I2C address
+
+### 🔴 Movement not saving
+
+* Ensure JSON save logic correct
+* Fix movement restore in Python
+
+---
+
+## 🔮 Future Improvements
+
+* 📱 Mobile App Integration
+* ☁️ Cloud Database (Firebase / MongoDB)
+* 📊 Analytics Dashboard
+* 🔔 Notifications System
+* 🧠 Face Recognition Integration
+
+---
+
+## 👨‍💻 Author
+
+**Rajyavardhan Radhey**
+CSE-AI | CSJMU Kanpur
+
+---
+
+## ⭐ Support
 
 If you like this project, give it a ⭐ on GitHub!
-
----
