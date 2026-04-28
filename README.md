@@ -252,17 +252,17 @@ python main.py
 
 ---
 
-## 🔮 Future Improvements
+##  Future Improvements
 
-* 📱 Mobile App Integration
-* ☁️ Cloud Database (Firebase / MongoDB)
-* 📊 Analytics Dashboard
-* 🔔 Notifications System
-* 🧠 Face Recognition Integration
+*  Mobile App Integration
+* Cloud Database (Firebase / MongoDB)
+*  Analytics Dashboard
+*  Notifications System
+* Face Recognition Integration
 
 ---
 
-## 👨‍💻 Author
+##  Author
 
 **Rajyavardhan Radhey**
 CSE-AI | CSJMU Kanpur
